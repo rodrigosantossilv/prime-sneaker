@@ -1,8 +1,5 @@
 import { defineStore } from 'pinia'
 
-const ADMIN_EMAIL = 'admin@tenisprime.com'
-const ADMIN_PASSWORD = 'admin123'
-
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     user: null,
@@ -13,12 +10,21 @@ export const useAuthStore = defineStore('auth', {
   },
 
   actions: {
-    login(email, password) {
-      if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
-        this.user = { email, name: 'Administrador' }
-        return { success: true }
+    async login(email, password) {
+      const response = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        return { success: false, message: data.message || 'Falha no login.' }
       }
-      return { success: false, message: 'E-mail ou senha incorretos.' }
+
+      const data = await response.json()
+      this.user = data.user
+      return { success: true }
     },
 
     logout() {

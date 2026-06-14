@@ -117,9 +117,8 @@ async function handlePaste(e) {
   }
 }
 
-function handleSubmit() {
+async function handleSubmit() {
   const product = {
-    id: Date.now().toString(),
     name: name.value || 'Novo produto',
     brand: brand.value || 'Marca',
     price: Number(price.value) || 0,
@@ -138,8 +137,13 @@ function handleSubmit() {
     promocao: false,
     oldPrice: null,
   }
-  productsStore.addProduct(product)
-  router.push('/admin/catalogo')
+
+  try {
+    await productsStore.addProduct(product)
+    router.push('/admin/catalogo')
+  } catch (error) {
+    alert('Erro ao cadastrar o produto. Tente novamente.')
+  }
 }
 </script>
 

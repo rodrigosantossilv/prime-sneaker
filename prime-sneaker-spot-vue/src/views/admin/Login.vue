@@ -78,8 +78,7 @@ async function handleLogin() {
     return
   }
   carregando.value = true
-  await new Promise(r => setTimeout(r, 500))
-  const result = authStore.login(email.value, senha.value)
+  const result = await authStore.login(email.value, senha.value)
   carregando.value = false
   if (result.success) {
     router.push('/admin/dashboard')
