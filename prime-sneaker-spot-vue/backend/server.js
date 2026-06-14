@@ -10,7 +10,7 @@ const app = express()
 const port = process.env.PORT || 3000
 
 app.use(cors())
-app.use(express.json({ limit: '10mb' }))
+app.use(express.json({ limit: '50mb' }))
 
 function normalizeImagesValue(value) {
   if (!value) return []
@@ -56,8 +56,20 @@ function buildProduct(row) {
   }
 }
 
+async function cleanupTestProducts() {
+  try {
+    const [result] = await db.query('DELETE FROM products WHERE name = ?', ['Teste-API'])
+    if (result.affectedRows > 0) {
+      console.log(`Removed ${result.affectedRows} test product(s) from the database.`)
+    }
+  } catch (error) {
+    console.error('Failed to remove test products:', error)
+  }
+}
+
 app.get('/api/products', async (req, res) => {
   try {
+    await cleanupTestProducts()
     const [rows] = await db.query('SELECT * FROM products ORDER BY id ASC')
     res.json(rows.map(buildProduct))
   } catch (error) {
@@ -98,8 +110,11 @@ app.post('/api/products', async (req, res) => {
       sales = 0,
       installments = 1,
       mercadoLink = '',
+      marketplaceLink = '',
       description = {},
     } = req.body
+
+    const effectiveMercadoLink = mercadoLink || marketplaceLink
 
     const [result] = await db.query(
       `INSERT INTO products
@@ -121,7 +136,7 @@ app.post('/api/products', async (req, res) => {
         reviews || 0,
         sales || 0,
         installments || 1,
-        mercadoLink,
+        effectiveMercadoLink,
         description.material || '',
         description.conforto || '',
         description.indicacao || '',

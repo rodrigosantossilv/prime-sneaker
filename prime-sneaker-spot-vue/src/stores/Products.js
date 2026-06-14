@@ -7,7 +7,7 @@ export const useProductsStore = defineStore('products', {
 
   actions: {
     async loadProducts() {
-      const response = await fetch('/api/products')
+      const response = await fetch('http://127.0.0.1:3000/api/products')
       if (!response.ok) {
         throw new Error('Não foi possível carregar os produtos.')
       }
@@ -15,17 +15,24 @@ export const useProductsStore = defineStore('products', {
     },
 
     async addProduct(product) {
-      const response = await fetch('/api/products', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(product),
-      })
-      if (!response.ok) {
-        throw new Error('Erro ao cadastrar o produto.')
+      try {
+        const response = await fetch('http://127.0.0.1:3000/api/products', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(product),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => null)
+          throw new Error(errorData?.message || `Erro ao cadastrar o produto. Status ${response.status}`)
+        }
+
+        const createdProduct = await response.json()
+        this.products.push(createdProduct)
+        return createdProduct
+      } catch (error) {
+        throw new Error(error.message || 'Erro ao cadastrar o produto.')
       }
-      const createdProduct = await response.json()
-      this.products.push(createdProduct)
-      return createdProduct
     },
 
     async updateProduct(updatedProduct) {

@@ -249,11 +249,12 @@ const favoritesStore = useFavoritesStore()
 
 const activeImg = ref(0)
 
-const product = computed(() =>
-  productsStore.products.find(
-    p => p.id === route.params.id
+const product = computed(() => {
+  const productId = Number(route.params.id)
+  return productsStore.products.find(
+    p => p.id === productId
   )
-)
+})
 
 watch(
   () => route.params.id,
