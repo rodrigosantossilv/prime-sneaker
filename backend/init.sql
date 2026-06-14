@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS products (
   category VARCHAR(100) DEFAULT 'geral',
   image_url TEXT,
   images JSON,
-  price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  price DECIMAL(10,2),
   old_price DECIMAL(10,2),
   promocao TINYINT(1) DEFAULT 0,
   destaque TINYINT(1) DEFAULT 0,

@@ -43,7 +43,7 @@
         <input v-model="brand" placeholder="Marca" class="border px-3 py-2 rounded" required />
 
         <div class="flex items-center gap-2">
-          <input v-model.number="price" type="number" step="0.01" placeholder="Preço" class="border px-3 py-2 rounded flex-1" required />
+          <input v-model.number="price" type="number" step="any" placeholder="Preço (opcional se houver link Mercado Livre)" class="border px-3 py-2 rounded flex-1" />
           <input v-model="category" placeholder="Categoria" class="border px-3 py-2 rounded w-56" />
         </div>
 
@@ -106,14 +106,19 @@ function removeImage(idx) {
 }
 
 async function handleSubmit() {
+  if (!price.value && !mercadoLink.value) {
+    alert('Informe o preço ou o link do Mercado Livre')
+    return
+  }
+
   const product = {
     name: name.value,
     brand: brand.value,
-    price: Number(price.value),
+    price: price.value ? Number(price.value) : null,
     category: category.value || 'Geral',
-    active: active.value,
     image: images.value[0] || '',
     images: images.value,
+    active: active.value,
     mercadoLink: mercadoLink.value,
     destaque: false,
     promocao: false,

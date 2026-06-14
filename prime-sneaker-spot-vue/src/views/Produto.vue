@@ -131,6 +131,20 @@
               {{ formatParcelas(product.price, product.installments) }}
             </div>
 
+            <div v-if="mercadoPrice" class="mt-3 rounded-xl border bg-slate-50 p-4 text-slate-900">
+              <div class="text-sm font-medium text-slate-600">Preço Mercado Livre atual</div>
+              <div class="mt-1 text-2xl font-bold">
+                {{ formatBRL(mercadoPrice.price) }}
+              </div>
+              <div class="mt-1 text-xs text-muted-foreground">
+                {{ mercadoPrice.currency }} • {{ mercadoPrice.availableQuantity }} em estoque
+              </div>
+            </div>
+
+            <div v-if="mercadoError" class="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-rose-700">
+              {{ mercadoError }}
+            </div>
+
             <div class="mt-5 flex gap-3">
 
               <a
@@ -242,6 +256,7 @@ import {
   discountPercent,
 } from '@/lib/format'
 
+
 const route = useRoute()
 
 const productsStore = useProductsStore()
@@ -299,4 +314,38 @@ const relatedProducts = computed(() => {
     )
     .slice(0, 4)
 })
+
+const mercadoPrice = ref(null)
+const mercadoError = ref('')
+
+async function loadMercadoPrice() {
+  if (!product.value || !product.value.mercadoLink) {
+    mercadoPrice.value = null
+    mercadoError.value = ''
+    return
+  }
+
+  try {
+    const response = await fetch(`/api/products/${product.value.id}/mercado-price`)
+    if (!response.ok) {
+      const data = await response.json().catch(() => null)
+      mercadoError.value = data?.message || 'Não foi possível carregar o preço Mercado Livre.'
+      mercadoPrice.value = null
+      return
+    }
+    mercadoPrice.value = await response.json()
+    mercadoError.value = ''
+  } catch (error) {
+    mercadoPrice.value = null
+    mercadoError.value = 'Erro ao carregar preço Mercado Livre.'
+  }
+}
+
+watch(
+  () => product.value,
+  () => {
+    loadMercadoPrice()
+  },
+  { immediate: true }
+)
 </script>

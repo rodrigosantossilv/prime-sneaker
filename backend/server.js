@@ -27,6 +27,56 @@ function normalizeImagesValue(value) {
   return []
 }
 
+async function resolveMercadoLivreItemId(link) {
+  if (!link) return null
+
+  let url = link.trim()
+  const browserHeaders = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+  }
+
+  // Tentar resolver links curtos
+  if (url.includes('meli.la') || url.includes('mercadolibre.com') || url.includes('mercadolivre.com.br')) {
+    try {
+      const resp = await fetch(url, { redirect: 'follow', headers: browserHeaders, timeout: 5000 })
+      if (resp.ok) {
+        url = resp.url
+      }
+    } catch (err) {
+      console.error('Failed to resolve short link:', err.message)
+    }
+  }
+
+  // Padrão 1: MLB123456789 ou ML-123456789
+  let m = url.match(/(MLB\d+)/i)
+  if (m) return m[1].toUpperCase()
+
+  // Padrão 2: /items/MLB123456789 ou /items/123456789
+  m = url.match(/\/items\/([A-Za-z0-9_-]+)/i)
+  if (m) {
+    const idPart = m[1]
+    // Se tem letras no início (tipo MLB), use como está
+    if (/^[A-Z]{3}/.test(idPart)) return idPart.toUpperCase()
+    // Se é só números, prefixe com MLB (Brasil)
+    if (/^\d+$/.test(idPart)) return 'MLB' + idPart
+    return idPart
+  }
+
+  // Padrão 3: procurar primeira sequência de 6+ dígitos e prefixar
+  m = url.match(/(\d{6,})/)
+  if (m) return 'MLB' + m[1]
+
+  return null
+}
+
+async function fetchMercadoLivrePrice(itemId) {
+  const response = await fetch(`https://api.mercadolibre.com/items/${itemId}`)
+  if (!response.ok) {
+    throw new Error(`Mercado Livre request failed with status ${response.status}`)
+  }
+  return response.json()
+}
+
 function buildProduct(row) {
   return {
     id: row.id,
@@ -91,6 +141,57 @@ app.get('/api/products/:id', async (req, res) => {
   }
 })
 
+app.get('/api/debug/resolve-link/:id', async (req, res) => {
+  try {
+    const [rows] = await db.query('SELECT mercado_link FROM products WHERE id = ?', [req.params.id])
+    if (!rows.length) {
+      return res.status(404).json({ message: 'Produto não encontrado.' })
+    }
+
+    const mercadoLink = rows[0].mercado_link || ''
+    const itemId = await resolveMercadoLivreItemId(mercadoLink)
+    
+    res.json({
+      link: mercadoLink,
+      resolvedItemId: itemId,
+      status: itemId ? 'success' : 'failed'
+    })
+  } catch (error) {
+    res.status(500).json({ message: 'Erro ao resolver link.' })
+  }
+})
+
+app.get('/api/products/:id/mercado-price', async (req, res) => {
+  try {
+    const [rows] = await db.query('SELECT mercado_link FROM products WHERE id = ?', [req.params.id])
+    if (!rows.length) {
+      return res.status(404).json({ message: 'Produto não encontrado.' })
+    }
+
+    const mercadoLink = rows[0].mercado_link || ''
+    if (!mercadoLink) {
+      return res.status(400).json({ message: 'O produto não possui link do Mercado Livre.' })
+    }
+
+    const itemId = await resolveMercadoLivreItemId(mercadoLink)
+    if (!itemId) {
+      return res.status(400).json({ message: 'Link do Mercado Livre inválido.' })
+    }
+
+    const data = await fetchMercadoLivrePrice(itemId)
+    res.json({
+      price: data.price,
+      currency: data.currency_id,
+      availableQuantity: data.available_quantity,
+      soldQuantity: data.sold_quantity,
+      permalink: data.permalink,
+    })
+  } catch (error) {
+    console.error('GET /api/products/:id/mercado-price error:', error)
+    res.status(500).json({ message: 'Erro ao buscar preço Mercado Livre.' })
+  }
+})
+
 app.post('/api/products', async (req, res) => {
   try {
     const {
@@ -115,6 +216,7 @@ app.post('/api/products', async (req, res) => {
     } = req.body
 
     const effectiveMercadoLink = mercadoLink || marketplaceLink
+    const productPrice = price ? Number(price) : null
 
     const [result] = await db.query(
       `INSERT INTO products
@@ -126,7 +228,7 @@ app.post('/api/products', async (req, res) => {
         category,
         image,
         JSON.stringify(Array.isArray(images) ? images : [images].filter(Boolean)),
-        price,
+        productPrice,
         oldPrice || null,
         promocao ? 1 : 0,
         destaque ? 1 : 0,
@@ -201,7 +303,7 @@ app.put('/api/products/:id', async (req, res) => {
         category,
         image,
         JSON.stringify(images),
-        price,
+        productPrice,
         oldPrice || null,
         promocao ? 1 : 0,
         destaque ? 1 : 0,
